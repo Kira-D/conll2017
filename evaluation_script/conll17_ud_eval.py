@@ -464,7 +464,8 @@ def evaluate(gold_ud, system_ud, deprel_weights=None):
     for dep_pair in frequency:
         print(dep_pair, rel_frequency[dep_pair])
 
-    return result
+    #return result
+    return rel_frequency
 
 def load_deprel_weights(weights_file):
     if weights_file is None:
