@@ -316,6 +316,16 @@ def evaluate(gold_ud, system_ud, deprel_weights=None):
                 correct += weight_fn(words.gold_word)
 
         return Score(gold, system, correct, aligned)
+        
+    def alignment_deprel_score(alignment):
+        from collections import defaultdict
+        rel_frequency = defaultdict(int)
+
+        for words in alignment.matched_words:
+            if words.gold_word.columns[DEPREL] != words.system_word.columns[DEPREL]:
+                rel_frequency[(words.gold_word.columns[DEPREL], words.system_word.columns[DEPREL])] += 1
+
+        return rel_frequency
 
     def beyond_end(words, i, multiword_span_end):
         if i >= len(words):
@@ -421,9 +431,14 @@ def evaluate(gold_ud, system_ud, deprel_weights=None):
 
     # Align words
     alignment = align_words(gold_ud.words, system_ud.words)
+    
+    import inspect
+    #print (list(alignment.__dict__.keys()))
+    #print (alignment.__dict__['matched_words_map'])
 
     def weighted_las(weights):
         return (lambda word: weights.get(word.columns[DEPREL], 1.0))
+
 
     # Compute the F1-scores
     result = {
@@ -443,6 +458,11 @@ def evaluate(gold_ud, system_ud, deprel_weights=None):
     # Add WeightedLAS if weights are given
     if deprel_weights is not None:
         result["WeightedLAS"] = alignment_score(alignment, lambda w, parent: (parent, w.columns[DEPREL]), weighted_las(deprel_weights))
+
+    rel_frequency = alignment_deprel_score(alignment)
+    frequency = sorted(rel_frequency, key=lambda x: rel_frequency[x], reverse=True)
+    for dep_pair in frequency:
+        print(dep_pair, rel_frequency[dep_pair])
 
     return result
 
