@@ -432,7 +432,7 @@ def evaluate(gold_ud, system_ud, deprel_weights=None):
     # Align words
     alignment = align_words(gold_ud.words, system_ud.words)
     
-    import inspect
+    #import inspect
     #print (list(alignment.__dict__.keys()))
     #print (alignment.__dict__['matched_words_map'])
 
@@ -461,11 +461,10 @@ def evaluate(gold_ud, system_ud, deprel_weights=None):
 
     rel_frequency = alignment_deprel_score(alignment)
     frequency = sorted(rel_frequency, key=lambda x: rel_frequency[x], reverse=True)
-    for dep_pair in frequency:
-        print(dep_pair, rel_frequency[dep_pair])
+    #for dep_pair in frequency:
+    #    print(dep_pair, rel_frequency[dep_pair])
 
-    #return result
-    return rel_frequency
+    return result, rel_frequency
 
 def load_deprel_weights(weights_file):
     if weights_file is None:
@@ -518,7 +517,7 @@ def main():
         args.verbose = 1
 
     # Evaluate
-    evaluation = evaluate_wrapper(args)
+    evaluation, labels = evaluate_wrapper(args)
 
     # Print the evaluation
     if not args.verbose:

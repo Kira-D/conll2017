@@ -4,9 +4,10 @@
 
 import sys
 import os
+import argparse
 
 from collections import defaultdict
-from conll17_ud_eval import evaluate
+from conll17_ud_eval import evaluate_wrapper
 
 
 gold_root = "../../data/gold_files"
@@ -14,12 +15,25 @@ system_root = "../../data/filtered-conllu" #change this path
 
 
 def main(system_gold_map):
+    sys.argv = ['conll17_ud_eval.py', 'foo', 'bar']
+    parser = argparse.ArgumentParser()
+    parser.add_argument("gold_file", type=str,
+                        help="Name of the CoNLL-U file with the gold data.")
+    parser.add_argument("system_file", type=str,
+                        help="Name of the CoNLL-U file with the predicted data.")
+    parser.add_argument("--weights", "-w", type=argparse.FileType("r"), default=None,
+                        metavar="deprel_weights_file",
+                        help="Compute WeightedLAS using given weights for Universal Dependency Relations.")
+    parser.add_argument("--verbose", "-v", default=0, action="count",
+                        help="Print all metrics.")
+    args = parser.parse_args()
+    
     for team in system_gold_map:
-        print(team)
         for lang in system_gold_map[team]:
-            print(lang)
-            #print(system_gold_map[team], lang)
-            print(evaluate(system_gold_map[team], lang))
+            sys.argv = ['conll17_ud_eval.py', system_gold_map[team][lang], lang]
+            args = parser.parse_args()
+            evaluation, labels = evaluate_wrapper(args)
+            print(labels)
 
 def get_paths(system_files, gold_files):
     gold_files_list = []
