@@ -5,16 +5,112 @@
 import sys
 import os
 import argparse
+import json
 
 from collections import defaultdict
 from conll17_ud_eval import evaluate_wrapper
 
 
 gold_root = "../../data/gold_files"
-system_root = "../../data/filtered-conllu" #change this path
+system_root = "../../data/sample" #change this path
+json_file_name = "all_data.json"
 
 
-def main(system_gold_map):
+def main():
+    json_file = open(json_file_name, 'r', encoding='UTF-8')
+    team_lang_statistics = json.load(json_file)
+
+    # Get statistics
+    get_stats_by_team(team_lang_statistics, threshold=0, relation='all')
+    get_laTex_table(team_lang_statistics, threshold=50, relation='all')
+    
+    
+    
+def get_stats_by_team(team_lang_statistics, threshold, relation):
+    temp_freq = {}
+    for team in sorted(team_lang_statistics, key=lambda x: x.lower()):
+        temp_freq[team] = defaultdict(int)
+        for lang in sorted(team_lang_statistics[team], key=lambda x: x.lower()):
+        
+            for dep_pair in sorted(team_lang_statistics[team][lang], 
+                                   key=lambda x: team_lang_statistics[team][lang][x], reverse=True):
+                                   
+                if team_lang_statistics[team][lang][dep_pair] > threshold:
+                
+                    if relation in dep_pair or relation == 'all':
+                        #print(dep_pair, team_lang_statistics[team][lang][dep_pair])
+                        temp_freq[team][dep_pair] += team_lang_statistics[team][lang][dep_pair]
+    
+    longest_row = 0
+    for team in temp_freq:
+        if len(temp_freq[team]) > longest_row:
+            longest_row = len(temp_freq[team])
+
+    list_of_lists = [[] for i in range(longest_row + 1)]
+    
+    for team in sorted(temp_freq, key=lambda x: x.lower()):
+        list_of_lists[0].append(team)
+        for i, pair in enumerate(sorted(temp_freq[team], key=lambda x: temp_freq[team][x], reverse=True)):
+            list_of_lists[i+1].append(str(pair) + ' ' + str(temp_freq[team][pair]))
+        for j in range(i+2, longest_row+1):
+            list_of_lists[j].append('-')
+        
+    outfile = open(relation + '.csv', 'w', encoding='UTF-8')
+    for line in list_of_lists:
+        outfile.write('\t\t'.join(line) + '\n')
+    outfile.close()
+    
+def get_laTex_table(team_lang_statistics, threshold, relation):
+    temp_freq = {}
+    for team in sorted(team_lang_statistics, key=lambda x: x.lower()):
+        temp_freq[team] = defaultdict(int)
+        for lang in sorted(team_lang_statistics[team], key=lambda x: x.lower()):
+        
+            for dep_pair in sorted(team_lang_statistics[team][lang], 
+                                   key=lambda x: team_lang_statistics[team][lang][x], reverse=True):
+                                   
+                if team_lang_statistics[team][lang][dep_pair] > threshold:
+                
+                    if relation in dep_pair or relation == 'all':
+                        #print(dep_pair, team_lang_statistics[team][lang][dep_pair])
+                        temp_freq[team][dep_pair] += team_lang_statistics[team][lang][dep_pair]
+    
+    longest_row = 0
+    for team in temp_freq:
+        if len(temp_freq[team]) > longest_row:
+            longest_row = len(temp_freq[team])
+
+    list_of_lists = [[] for i in range(longest_row + 1)]
+    
+    for team in sorted(temp_freq, key=lambda x: x.lower()):
+        list_of_lists[0].append(team)
+        for i, pair in enumerate(sorted(temp_freq[team], key=lambda x: temp_freq[team][x], reverse=True)):
+            list_of_lists[i+1].append(str(pair) + ' ' + str(temp_freq[team][pair]))
+        for j in range(i+2, longest_row+1):
+            list_of_lists[j].append('-')
+        
+    outfile = open(relation + '.txt', 'w', encoding='UTF-8')
+    outfile.write('\\begin{table*}[ht]\n\\begin{center}\n\\begin{tabular}{|' + 'c|'*len(list_of_lists[0]) + '}\n\\hline\n')
+    for line in list_of_lists:
+        outfile.write(' & '.join(line) + ' \\\\\n')
+        outfile.write('\\hline\n')
+    outfile.write('\\end{tabular}\n\\caption{The caption of the big table}\n\\end{center}\n\\end{table*}')
+    outfile.close()
+
+    
+    
+def get_stats(team_lang_statistics, threshold, relation):
+    for team in sorted(team_lang_statistics, key=lambda x: x.lower()):
+        for lang in sorted(team_lang_statistics[team], key=lambda x: x.lower()):
+            for dep_pair in sorted(team_lang_statistics[team][lang], 
+                                   key=lambda x: team_lang_statistics[team][lang][x], reverse=True):
+                if team_lang_statistics[team][lang][dep_pair] > threshold:
+                    if relation in dep_pair or relation == 'all':
+                        print(dep_pair, team_lang_statistics[team][lang][dep_pair])
+
+
+def data_to_json(system_gold_map):
+    # Send paits to evaluate_wrapper funcion from conll17_ud_eval
     sys.argv = ['conll17_ud_eval.py', 'foo', 'bar']
     parser = argparse.ArgumentParser()
     parser.add_argument("gold_file", type=str,
@@ -28,14 +124,23 @@ def main(system_gold_map):
                         help="Print all metrics.")
     args = parser.parse_args()
     
+    team_lang_statistics = defaultdict(dict)
+
     for team in system_gold_map:
         for lang in system_gold_map[team]:
             sys.argv = ['conll17_ud_eval.py', system_gold_map[team][lang], lang]
             args = parser.parse_args()
-            evaluation, labels = evaluate_wrapper(args)
-            print(labels)
+            evaluation, labels = evaluate_wrapper(args) # look at the evaluation parameter!!!!
+            #print(evaluation['LAS'])
+            lang = os.path.basename(lang)
+            team_lang_statistics[team][lang] = labels
+
+    file_temp = open(json_file_name, 'w', encoding='UTF-8')
+    file_temp.write(json.dumps(team_lang_statistics))
 
 def get_paths(system_files, gold_files):
+    # Collect paths to gold and system files.
+    # Outout format: Dictionaty {'Team': {system_parsed_file:corresponding_gold_file}, {}}
     gold_files_list = []
     system_files_dict = defaultdict(str) #this is a dict of lists
     system_gold_map = defaultdict(dict)
@@ -54,11 +159,11 @@ def get_paths(system_files, gold_files):
         for language in system_files_dict[parser]:
             if os.path.join(gold_files, os.path.basename(language)) in gold_files_list:
                 system_gold_map[parser][language] = os.path.join(gold_files, os.path.basename(language)) #{sys_file:gold:file}
+                
     return system_gold_map
 
 if __name__ == "__main__":
-    system_gold_map = get_paths(system_root, gold_root)
-    main(system_gold_map)
-    
-    
-    
+    #system_gold_map = get_paths(system_root, gold_root)
+    #data_to_json(system_gold_map)
+    main()
+        

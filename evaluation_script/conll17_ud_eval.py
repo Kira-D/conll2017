@@ -323,7 +323,7 @@ def evaluate(gold_ud, system_ud, deprel_weights=None):
 
         for words in alignment.matched_words:
             if words.gold_word.columns[DEPREL] != words.system_word.columns[DEPREL]:
-                rel_frequency[(words.gold_word.columns[DEPREL], words.system_word.columns[DEPREL])] += 1
+                rel_frequency[words.gold_word.columns[DEPREL] + '-' + words.system_word.columns[DEPREL]] += 1
 
         return rel_frequency
 
@@ -460,9 +460,6 @@ def evaluate(gold_ud, system_ud, deprel_weights=None):
         result["WeightedLAS"] = alignment_score(alignment, lambda w, parent: (parent, w.columns[DEPREL]), weighted_las(deprel_weights))
 
     rel_frequency = alignment_deprel_score(alignment)
-    frequency = sorted(rel_frequency, key=lambda x: rel_frequency[x], reverse=True)
-    #for dep_pair in frequency:
-    #    print(dep_pair, rel_frequency[dep_pair])
 
     return result, rel_frequency
 
