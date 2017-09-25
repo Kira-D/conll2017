@@ -313,17 +313,23 @@ def evaluate(gold_ud, system_ud, deprel_weights=None):
 
         for words in alignment.matched_words:
             if key_fn(words.gold_word, words.gold_parent) == key_fn(words.system_word, words.system_parent_gold_aligned):
+                #print((words.gold_word, words.gold_parent), (words.system_word, words.system_parent_gold_aligned))
                 correct += weight_fn(words.gold_word)
 
         return Score(gold, system, correct, aligned)
         
     def alignment_deprel_score(alignment):
         from collections import defaultdict
-        rel_frequency = defaultdict(int)
-
+        rel_frequency = {}
+        
         for words in alignment.matched_words:
             if words.gold_word.columns[DEPREL] != words.system_word.columns[DEPREL]:
-                rel_frequency[words.gold_word.columns[DEPREL] + '-' + words.system_word.columns[DEPREL]] += 1
+                if words.gold_word.columns[DEPREL] + '-' + words.system_word.columns[DEPREL] not in rel_frequency:                
+                    rel_frequency[words.gold_word.columns[DEPREL] + '-' + words.system_word.columns[DEPREL]] = [0, 0]
+                rel_frequency[words.gold_word.columns[DEPREL] + '-' + words.system_word.columns[DEPREL]][0] += 1
+                if words.gold_parent not in [None, 0] and words.system_parent_gold_aligned not in [None, 0] and \
+                   words.gold_parent.columns[DEPREL] != words.system_parent_gold_aligned.columns[DEPREL]:
+                    rel_frequency[words.gold_word.columns[DEPREL] + '-' + words.system_word.columns[DEPREL]][1] += 1
 
         return rel_frequency
 

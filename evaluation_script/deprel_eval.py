@@ -19,28 +19,29 @@ def main(gold_files_names):
     team_lang_statistics = json.load(json_file)
 
     # Get statistics
-    get_stats_by_team(team_lang_statistics, threshold=0, relation='all')
-    get_laTex_table(team_lang_statistics, threshold=50, relation='all')
     get_stats_by_team(team_lang_statistics, threshold=0, relation='orphan')
-    get_laTex_table(team_lang_statistics, threshold=0, relation='orphan')
-    get_stats(team_lang_statistics, gold_files_names, top=5, relation='all') #all matrix
+    #get_laTex_table(team_lang_statistics, threshold=0, relation='orphan')
+    #get_stats(team_lang_statistics, gold_files_names, top=5, relation='all') #all matrix
     
     
     
 def get_stats_by_team(team_lang_statistics, threshold, relation):
     temp_freq = {}
     for team in sorted(team_lang_statistics, key=lambda x: x.lower()):
-        temp_freq[team] = defaultdict(int)
+        temp_freq[team] = {}
         for lang in sorted(team_lang_statistics[team], key=lambda x: x.lower()):
         
             for dep_pair in sorted(team_lang_statistics[team][lang], 
                                    key=lambda x: team_lang_statistics[team][lang][x], reverse=True):
                                    
-                if team_lang_statistics[team][lang][dep_pair] > threshold:
+                if team_lang_statistics[team][lang][dep_pair][0] > threshold:
                 
                     if relation in dep_pair or relation == 'all':
-                        #print(dep_pair, team_lang_statistics[team][lang][dep_pair])
-                        temp_freq[team][dep_pair] += team_lang_statistics[team][lang][dep_pair]
+                        if dep_pair not in temp_freq[team]:
+                            temp_freq[team][dep_pair] = [0, 0]
+
+                        temp_freq[team][dep_pair][0] += team_lang_statistics[team][lang][dep_pair][0]
+                        temp_freq[team][dep_pair][1] += team_lang_statistics[team][lang][dep_pair][1]
 
     #Create table    
     longest_row = 0
@@ -48,26 +49,30 @@ def get_stats_by_team(team_lang_statistics, threshold, relation):
         if len(temp_freq[team]) > longest_row:
             longest_row = len(temp_freq[team])
 
-    # Calculate number of errors and persentage
+    # Calculate number of errors and percentage
     for team in temp_freq:
         error_num = 0
         for pair in temp_freq[team]:
-            error_num += temp_freq[team][pair]
+            error_num += temp_freq[team][pair][0]
         for rel_pair in temp_freq[team]:
-            temp_freq[team][rel_pair] = (temp_freq[team][rel_pair], round(float(temp_freq[team][rel_pair]) / float(error_num) * 100, 2))
+            temp_freq[team][rel_pair][0] = (temp_freq[team][rel_pair][0], round(float(temp_freq[team][rel_pair][0]) / float(error_num) * 100, 2))
 
     list_of_lists = [[] for i in range(longest_row + 1)]
     
     for team in sorted(temp_freq, key=lambda x: x.lower()):
         list_of_lists[0].append(team)
+        i = -1
         for i, pair in enumerate(sorted(temp_freq[team], key=lambda x: temp_freq[team][x], reverse=True)):
-            list_of_lists[i+1].append(str(pair) + ' ' + str(temp_freq[team][pair][1]) + '% ' + str(temp_freq[team][pair][0]))
+            list_of_lists[i+1].append(str(pair) + ' ' + str(temp_freq[team][pair][0][1]) +
+                                      '% ' + str(temp_freq[team][pair][0][0]) + ' headness: ' +
+                                      str(round(float(temp_freq[team][pair][1]) / float(temp_freq[team][pair][0][0]) * 100, 2)) + '% ' +
+                                      str(temp_freq[team][pair][1]))
         for j in range(i+2, longest_row+1):
             list_of_lists[j].append('-')
         
     outfile = open(relation + '.csv', 'w', encoding='UTF-8')
     for line in list_of_lists:
-        outfile.write('\t\t'.join(line) + '\n')
+        outfile.write('\t'.join(line) + '\n')
     outfile.close()
     
 def get_laTex_table(team_lang_statistics, threshold, relation):
@@ -117,14 +122,6 @@ def get_laTex_table(team_lang_statistics, threshold, relation):
     outfile.close()
 
 def get_stats(team_lang_statistics, gold_files_names, top, relation):
-    #for team in sorted(team_lang_statistics, key=lambda x: x.lower()):
-        #for lang in sorted(team_lang_statistics[team], key=lambda x: x.lower()):
-            #for dep_pair in sorted(team_lang_statistics[team][lang], 
-                                   #key=lambda x: team_lang_statistics[team][lang][x], reverse=True):
-                #if team_lang_statistics[team][lang][dep_pair] > threshold:
-                    #if relation in dep_pair or relation == 'all':
-                        #print(dep_pair, team_lang_statistics[team][lang][dep_pair])
-
     sorted_teams = sorted(team_lang_statistics, key=lambda x: x.lower())
     length_langs = len(gold_files_names) + 1
     list_of_lists = [[''] + sorted_teams]
