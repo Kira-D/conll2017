@@ -10,19 +10,20 @@ import json
 from collections import defaultdict
 from conll17_ud_eval import evaluate_wrapper
 
-
 gold_root = "../../data/gold_files"
-system_root = "../../data/sample" #change this path
+system_root = "../../data/system" #change this path
 json_file_name = "all_data.json"
 
-
-def main():
+def main(gold_files_names):
     json_file = open(json_file_name, 'r', encoding='UTF-8')
     team_lang_statistics = json.load(json_file)
 
     # Get statistics
     get_stats_by_team(team_lang_statistics, threshold=0, relation='all')
     get_laTex_table(team_lang_statistics, threshold=50, relation='all')
+    get_stats_by_team(team_lang_statistics, threshold=0, relation='orphan')
+    get_laTex_table(team_lang_statistics, threshold=0, relation='orphan')
+    get_stats(team_lang_statistics, gold_files_names, top=5, relation='all') #all matrix
     
     
     
@@ -40,18 +41,27 @@ def get_stats_by_team(team_lang_statistics, threshold, relation):
                     if relation in dep_pair or relation == 'all':
                         #print(dep_pair, team_lang_statistics[team][lang][dep_pair])
                         temp_freq[team][dep_pair] += team_lang_statistics[team][lang][dep_pair]
-    
+
+    #Create table    
     longest_row = 0
     for team in temp_freq:
         if len(temp_freq[team]) > longest_row:
             longest_row = len(temp_freq[team])
+
+    # Calculate number of errors and persentage
+    for team in temp_freq:
+        error_num = 0
+        for pair in temp_freq[team]:
+            error_num += temp_freq[team][pair]
+        for rel_pair in temp_freq[team]:
+            temp_freq[team][rel_pair] = (temp_freq[team][rel_pair], round(float(temp_freq[team][rel_pair]) / float(error_num) * 100, 2))
 
     list_of_lists = [[] for i in range(longest_row + 1)]
     
     for team in sorted(temp_freq, key=lambda x: x.lower()):
         list_of_lists[0].append(team)
         for i, pair in enumerate(sorted(temp_freq[team], key=lambda x: temp_freq[team][x], reverse=True)):
-            list_of_lists[i+1].append(str(pair) + ' ' + str(temp_freq[team][pair]))
+            list_of_lists[i+1].append(str(pair) + ' ' + str(temp_freq[team][pair][1]) + '% ' + str(temp_freq[team][pair][0]))
         for j in range(i+2, longest_row+1):
             list_of_lists[j].append('-')
         
@@ -74,18 +84,27 @@ def get_laTex_table(team_lang_statistics, threshold, relation):
                     if relation in dep_pair or relation == 'all':
                         #print(dep_pair, team_lang_statistics[team][lang][dep_pair])
                         temp_freq[team][dep_pair] += team_lang_statistics[team][lang][dep_pair]
-    
+
+    #Create table    
     longest_row = 0
     for team in temp_freq:
         if len(temp_freq[team]) > longest_row:
             longest_row = len(temp_freq[team])
+
+    # Calculate number of errors and persentage
+    for team in temp_freq:
+        error_num = 0
+        for pair in temp_freq[team]:
+            error_num += temp_freq[team][pair]
+        for rel_pair in temp_freq[team]:
+            temp_freq[team][rel_pair] = (temp_freq[team][rel_pair], round(float(temp_freq[team][rel_pair]) / float(error_num) * 100, 2))
 
     list_of_lists = [[] for i in range(longest_row + 1)]
     
     for team in sorted(temp_freq, key=lambda x: x.lower()):
         list_of_lists[0].append(team)
         for i, pair in enumerate(sorted(temp_freq[team], key=lambda x: temp_freq[team][x], reverse=True)):
-            list_of_lists[i+1].append(str(pair) + ' ' + str(temp_freq[team][pair]))
+            list_of_lists[i+1].append(str(pair) + ' ' + str(temp_freq[team][pair][1]) + '% ' + str(temp_freq[team][pair][0]))
         for j in range(i+2, longest_row+1):
             list_of_lists[j].append('-')
         
@@ -97,16 +116,31 @@ def get_laTex_table(team_lang_statistics, threshold, relation):
     outfile.write('\\end{tabular}\n\\caption{The caption of the big table}\n\\end{center}\n\\end{table*}')
     outfile.close()
 
-    
-    
-def get_stats(team_lang_statistics, threshold, relation):
-    for team in sorted(team_lang_statistics, key=lambda x: x.lower()):
-        for lang in sorted(team_lang_statistics[team], key=lambda x: x.lower()):
-            for dep_pair in sorted(team_lang_statistics[team][lang], 
-                                   key=lambda x: team_lang_statistics[team][lang][x], reverse=True):
-                if team_lang_statistics[team][lang][dep_pair] > threshold:
-                    if relation in dep_pair or relation == 'all':
-                        print(dep_pair, team_lang_statistics[team][lang][dep_pair])
+def get_stats(team_lang_statistics, gold_files_names, top, relation):
+    #for team in sorted(team_lang_statistics, key=lambda x: x.lower()):
+        #for lang in sorted(team_lang_statistics[team], key=lambda x: x.lower()):
+            #for dep_pair in sorted(team_lang_statistics[team][lang], 
+                                   #key=lambda x: team_lang_statistics[team][lang][x], reverse=True):
+                #if team_lang_statistics[team][lang][dep_pair] > threshold:
+                    #if relation in dep_pair or relation == 'all':
+                        #print(dep_pair, team_lang_statistics[team][lang][dep_pair])
+
+    sorted_teams = sorted(team_lang_statistics, key=lambda x: x.lower())
+    length_langs = len(gold_files_names) + 1
+    list_of_lists = [[''] + sorted_teams]
+    for lang in sorted(gold_files_names):
+        lang_by_team = [lang]
+        for team in sorted_teams:
+            if lang in team_lang_statistics[team]:
+                lang_by_team.append([(dep_pair, team_lang_statistics[team][lang][dep_pair])
+                                        for dep_pair
+                                            in sorted(team_lang_statistics[team][lang], 
+                                                      key=lambda x: team_lang_statistics[team][lang][x],
+                                                      reverse=True)][:top])
+            else:
+                lang_by_team.append([])
+        list_of_lists.append(lang_by_team)
+    print(*list_of_lists, sep='\n')
 
 
 def data_to_json(system_gold_map):
@@ -160,10 +194,10 @@ def get_paths(system_files, gold_files):
             if os.path.join(gold_files, os.path.basename(language)) in gold_files_list:
                 system_gold_map[parser][language] = os.path.join(gold_files, os.path.basename(language)) #{sys_file:gold:file}
                 
-    return system_gold_map
+    return system_gold_map, gold_files_names
 
 if __name__ == "__main__":
-    #system_gold_map = get_paths(system_root, gold_root)
+    system_gold_map, gold_files_names = get_paths(system_root, gold_root)
     #data_to_json(system_gold_map)
-    main()
+    main(gold_files_names)
         
