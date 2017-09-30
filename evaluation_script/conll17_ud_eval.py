@@ -244,7 +244,7 @@ def load_conllu(file):
     return ud
 
 # Evaluate the gold and system treebanks (loaded using load_conllu).
-def evaluate(gold_ud, system_ud, deprel_weights=None):
+def evaluate(gold_ud, system_ud, gold_name, system_name, deprel_weights=None):
     class Score:
         def __init__(self, gold_total, system_total, correct, aligned_total=None):
             self.precision = correct / system_total if system_total else 0.0
@@ -319,7 +319,6 @@ def evaluate(gold_ud, system_ud, deprel_weights=None):
         return Score(gold, system, correct, aligned)
         
     def alignment_deprel_score(alignment):
-        from collections import defaultdict
         rel_frequency = {}
         
         for words in alignment.matched_words:
@@ -332,6 +331,55 @@ def evaluate(gold_ud, system_ud, deprel_weights=None):
                     rel_frequency[words.gold_word.columns[DEPREL] + '-' + words.system_word.columns[DEPREL]][1] += 1
 
         return rel_frequency
+
+    def alignment_orphan_score(alignment):
+        orphan_frequency = {}
+        
+        for words in alignment.matched_words:
+            if words.gold_word.columns[DEPREL] == 'orphan':
+                if words.gold_word.columns[DEPREL] + '-' + words.system_word.columns[DEPREL] not in orphan_frequency:                
+                    orphan_frequency[words.gold_word.columns[DEPREL] + '-' + words.system_word.columns[DEPREL]] = [0, 0]
+                orphan_frequency[words.gold_word.columns[DEPREL] + '-' + words.system_word.columns[DEPREL]][0] += 1
+                if words.gold_parent not in [None, 0] and words.system_parent_gold_aligned not in [None, 0] and \
+                   words.gold_parent.columns[DEPREL] != words.system_parent_gold_aligned.columns[DEPREL]:
+                    orphan_frequency[words.gold_word.columns[DEPREL] + '-' + words.system_word.columns[DEPREL]][1] += 1
+
+        return orphan_frequency
+
+    def collect_orphans(alignment, gold_name, system_name):
+        out_file_gold = open(system_name + 'out_file_gold.conllu', 'w', encoding='UTF-8')
+        out_file_system = open(system_name + 'out_file.conllu', 'w', encoding='UTF-8')
+
+        position_start_gold = 0
+        position_start_system = 0
+        for i, words in enumerate(alignment.matched_words):
+            if words.gold_word.columns[ID] == '1':
+                position_start_gold = i
+                stop_writing = False
+            if words.system_word.columns[ID] == '1':
+                position_start_system = i
+                stop_writing = False
+
+            if words.gold_word.columns[DEPREL] != words.system_word.columns[DEPREL] and \
+                (words.gold_word.columns[DEPREL] == 'orphan' or words.system_word.columns[DEPREL] == 'orphan'):
+                if stop_writing:
+                    continue
+                for j, token_towrite in enumerate(alignment.matched_words[position_start_gold:]):
+                    if token_towrite.gold_word.columns[ID] == '1' and token_towrite != alignment.matched_words[position_start_gold]:
+                        break
+                    out_file_gold.write('\t'.join(token_towrite.gold_word.columns) + '\n')
+
+                out_file_gold.write('\n')
+
+                for j, token_towrite in enumerate(alignment.matched_words[position_start_system:]):
+                    if token_towrite.system_word.columns[ID] == '1' and token_towrite != alignment.matched_words[position_start_system]:
+                        break
+                    out_file_system.write('\t'.join(token_towrite.system_word.columns) + '\n')
+                out_file_system.write('\n')
+                stop_writing = True
+
+        out_file_gold.close()
+        out_file_system.close()
 
     def beyond_end(words, i, multiword_span_end):
         if i >= len(words):
@@ -438,10 +486,6 @@ def evaluate(gold_ud, system_ud, deprel_weights=None):
     # Align words
     alignment = align_words(gold_ud.words, system_ud.words)
     
-    #import inspect
-    #print (list(alignment.__dict__.keys()))
-    #print (alignment.__dict__['matched_words_map'])
-
     def weighted_las(weights):
         return (lambda word: weights.get(word.columns[DEPREL], 1.0))
 
@@ -466,8 +510,10 @@ def evaluate(gold_ud, system_ud, deprel_weights=None):
         result["WeightedLAS"] = alignment_score(alignment, lambda w, parent: (parent, w.columns[DEPREL]), weighted_las(deprel_weights))
 
     rel_frequency = alignment_deprel_score(alignment)
+    orphan_frequency = alignment_orphan_score(alignment)
+    collect_orphans(alignment, gold_name, system_name)
 
-    return result, rel_frequency
+    return result, rel_frequency, orphan_frequency
 
 def load_deprel_weights(weights_file):
     if weights_file is None:
@@ -499,7 +545,7 @@ def evaluate_wrapper(args):
     # Load weights if requested
     deprel_weights = load_deprel_weights(args.weights)
 
-    return evaluate(gold_ud, system_ud, deprel_weights)
+    return evaluate(gold_ud, system_ud, args.gold_file, args.system_file, deprel_weights)
 
 def main():
     # Parse arguments
