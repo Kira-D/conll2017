@@ -23,13 +23,14 @@ def main(gold_files_names):
     team_lang_correct_orph = json.load(json_file_orph)
 
     # Get statistics
-    get_stats_by_team(team_lang_statistics, threshold=0, relation='orphan')
+    for_precision = get_stats_by_team(team_lang_statistics, threshold=0, relation='orphan')
     get_laTex_table(team_lang_statistics, threshold=0, relation='orphan')
-    correct_orphan_stats(team_lang_correct_orph)
+    correct_orphan_stats(team_lang_correct_orph, for_precision)
+
     #get_stats(team_lang_statistics, gold_files_names, top=5, relation='all') #ToDo it's not working
     
 
-def correct_orphan_stats(team_lang_correct_orph):
+def correct_orphan_stats(team_lang_correct_orph, for_precision):
     correct_stats = {}
     for team in sorted(team_lang_correct_orph, key=lambda x: x.lower()):
         correct_stats[team] = ()
@@ -50,16 +51,38 @@ def correct_orphan_stats(team_lang_correct_orph):
         correct_stats[team] = (all_orph_num, correct_orph_num, correct_parent_num)
 
     outfile = open('correct_orphans.csv', 'w', encoding='UTF-8')
-    outfile.write('\t'.join(['Parser', 'Aligned orphan number', 'Correct', 'Correct %', 'Correct parent', 'Correct parent %']) + '\n')
+    outfile.write('\t'.join(['Parser', 'Aligned orphan number', 'Correct', 'Recall', 'F1', 'Correct parent', 'Correct parent %']) + '\n')
     for team in sorted(correct_stats, key=lambda x: x.lower()):
         try:
+            p = float(correct_stats[team][1]) / float(for_precision[team])
+            r = float(correct_stats[team][1]) / float(correct_stats[team][0])
+            f1 = str(round(200. * p * r / (p + r), 2))
+
             outfile.write('\t'.join([team, str(correct_stats[team][0]), str(correct_stats[team][1]),
-                                str(round(float(correct_stats[team][1])/float(correct_stats[team][0]) * 100, 2)) + '%',
+                                str(round(float(correct_stats[team][1])/float(correct_stats[team][0]) * 100, 2)) + '%', f1 + '%',
                                 str(correct_stats[team][2]), str(round(float(correct_stats[team][2])/float(correct_stats[team][1]) * 100, 2)) + '%']) + '\n')
         except ZeroDivisionError:
-            outfile.write('\t'.join([team, str(correct_stats[team][0]), str(correct_stats[team][1]), '0%', str(correct_stats[team][2]), '0%']) + '\n')
+            outfile.write('\t'.join([team, str(correct_stats[team][0]), str(correct_stats[team][1]), '0%', '0%', str(correct_stats[team][2]), '0%']) + '\n')
     outfile.close()
-        
+
+    outfile = open('correct_orphans.txt', 'w', encoding='UTF-8')
+    outfile.write('\\begin{table*}[ht]\n\\begin{center}\n\\begin{tabular}{|' + 'c|'* 6 + '}\n\\hline\n')
+    outfile.write(' & '.join(['Parser', 'Aligned orphan number', 'Correct', 'Recall', 'F1', 'Correct parent', 'Correct parent %']) + ' \\\\\n')
+    for team in sorted(correct_stats, key=lambda x: x.lower()):
+        try:
+            p = float(correct_stats[team][1]) / float(for_precision[team])
+            r = float(correct_stats[team][1]) / float(correct_stats[team][0])
+            f1 = str(round(200. * p * r / (p + r), 2))
+
+            outfile.write(' & '.join([team, str(correct_stats[team][0]), str(correct_stats[team][1]),
+                                str(round(float(correct_stats[team][1])/float(correct_stats[team][0]) * 100, 2)) + '%', f1 + '%',
+                                str(correct_stats[team][2]), str(round(float(correct_stats[team][2])/float(correct_stats[team][1]) * 100, 2)) + '%']) + ' \\\\\n')
+            outfile.write('\\hline\n')
+        except ZeroDivisionError:
+            outfile.write(' & '.join([team, str(correct_stats[team][0]), str(correct_stats[team][1]), '0%', '0%', str(correct_stats[team][2]), '0%']) + ' \\\\\n')
+            outfile.write('\\hline\n')
+    outfile.write('\\end{tabular}\n\\caption{The caption of the big table}\n\\end{center}\n\\end{table*}')
+    outfile.close()
     
 def get_stats_by_team(team_lang_statistics, threshold, relation):
     temp_freq = {}
@@ -98,7 +121,8 @@ def get_stats_by_team(team_lang_statistics, threshold, relation):
     for team in sorted(temp_freq, key=lambda x: x.lower()):
         list_of_lists[0].append(team)
         i = -1
-        for i, pair in enumerate(sorted(temp_freq[team], key=lambda x: temp_freq[team][x], reverse=True)):
+        for i, pair in enumerate(sorted(temp_freq[team], key=lambda x: temp_freq[team][x], reverse=True)): 
+            # %err of this type + number of instances + %err parents + err parent instances
             list_of_lists[i+1].append(str(pair) + ' ' + str(temp_freq[team][pair][0][1]) +
                                       '% ' + str(temp_freq[team][pair][0][0]) + ' headness: ' +
                                       str(round(float(temp_freq[team][pair][1]) / float(temp_freq[team][pair][0][0]) * 100, 2)) + '% ' +
@@ -110,6 +134,15 @@ def get_stats_by_team(team_lang_statistics, threshold, relation):
     for line in list_of_lists:
         outfile.write('\t'.join(line) + '\n')
     outfile.close()
+
+    #Calc number of predicted orphans (per team)
+    for_precision = defaultdict(int)
+    for team in temp_freq:
+        for pair in temp_freq[team]:
+            if pair.endswith('orphan'):
+                for_precision[team] += temp_freq[team][pair][0][0]
+
+    return for_precision
     
 def get_laTex_table(team_lang_statistics, threshold, relation):
     temp_freq = {}
@@ -255,6 +288,6 @@ def get_paths(system_files, gold_files):
 
 if __name__ == "__main__":
     system_gold_map, gold_files_names = get_paths(system_root, gold_root)
-    data_to_json(system_gold_map)
+    #data_to_json(system_gold_map)
     main(gold_files_names)
         
