@@ -24,7 +24,7 @@ def main(gold_files_names):
 
     # Get statistics
     for_precision = get_stats_by_team(team_lang_statistics, threshold=0, relation='orphan')
-    get_laTex_table(team_lang_statistics, threshold=0, relation='orphan')
+    get_laTex_table(team_lang_statistics, threshold=0, relation='orphan') #error in the threshold
     correct_orphan_stats(team_lang_correct_orph, for_precision)
 
     #get_stats(team_lang_statistics, gold_files_names, top=5, relation='all') #ToDo it's not working
@@ -66,8 +66,9 @@ def correct_orphan_stats(team_lang_correct_orph, for_precision):
     outfile.close()
 
     outfile = open('correct_orphans.txt', 'w', encoding='UTF-8')
-    outfile.write('\\begin{table*}[ht]\n\\begin{center}\n\\begin{tabular}{|' + 'c|'* 6 + '}\n\\hline\n')
-    outfile.write(' & '.join(['Parser', 'Aligned orphan number', 'Correct', 'Recall', 'F1', 'Correct parent', 'Correct parent %']) + ' \\\\\n')
+    outfile.write('\\begin{table*}[ht]\n\\begin{center}\n\\begin{tabular}{|' + 'c|'* 7 + '}\n\\hline\n')
+    outfile.write(' & '.join(['Parser', 'All', 'Correct', 'Recall', 'F1', 'Parent', 'Parent \%']) + ' \\\\\n')
+    outfile.write('\\hline\n')
     for team in sorted(correct_stats, key=lambda x: x.lower()):
         try:
             p = float(correct_stats[team][1]) / float(for_precision[team])
@@ -75,8 +76,8 @@ def correct_orphan_stats(team_lang_correct_orph, for_precision):
             f1 = str(round(200. * p * r / (p + r), 2))
 
             outfile.write(' & '.join([team, str(correct_stats[team][0]), str(correct_stats[team][1]),
-                                str(round(float(correct_stats[team][1])/float(correct_stats[team][0]) * 100, 2)) + '%', f1 + '%',
-                                str(correct_stats[team][2]), str(round(float(correct_stats[team][2])/float(correct_stats[team][1]) * 100, 2)) + '%']) + ' \\\\\n')
+                                str(round(float(correct_stats[team][1])/float(correct_stats[team][0]) * 100, 2)) + '\%', f1 + '\%',
+                                str(correct_stats[team][2]), str(round(float(correct_stats[team][2])/float(correct_stats[team][1]) * 100, 2)) + '\%']) + ' \\\\\n')
             outfile.write('\\hline\n')
         except ZeroDivisionError:
             outfile.write(' & '.join([team, str(correct_stats[team][0]), str(correct_stats[team][1]), '0%', '0%', str(correct_stats[team][2]), '0%']) + ' \\\\\n')
@@ -183,8 +184,8 @@ def get_laTex_table(team_lang_statistics, threshold, relation):
         i = -1
         for i, pair in enumerate(sorted(temp_freq[team], key=lambda x: temp_freq[team][x], reverse=True)):
             list_of_lists[i+1].append(str(pair) + ' ' + str(temp_freq[team][pair][0][1]) +
-                                      '% ' + str(temp_freq[team][pair][0][0]) + ' headness: ' +
-                                      str(round(float(temp_freq[team][pair][1]) / float(temp_freq[team][pair][0][0]) * 100, 2)) + '% ' +
+                                      '\% ' + str(temp_freq[team][pair][0][0]) + ' headness: ' +
+                                      str(round(float(temp_freq[team][pair][1]) / float(temp_freq[team][pair][0][0]) * 100, 2)) + '\% ' +
                                       str(temp_freq[team][pair][1]))
         for j in range(i+2, longest_row+1):
             list_of_lists[j].append('-')
